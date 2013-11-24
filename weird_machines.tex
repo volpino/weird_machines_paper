@@ -1,0 +1,97 @@
+\documentclass[11pt,twoside,a4paper]{article}
+\usepackage{a4wide,amsmath,amssymb}
+% \usepackage[ngerman]{babel}
+\usepackage[utf8x]{inputenc}
+\hyphenation{}
+
+% Build pdf:
+% $ pdflatex seminar_template.tex
+% $ pdflatex seminar_template.tex
+% Run pdflatex twice to get the references right...
+
+
+%-------------------------- Formatting --------------------------%
+
+% Picture and table title formats
+\usepackage[bf,small]{caption}
+
+%\usepackage{mathpazo}  % -- use Palatino --
+%\usepackage{mathptmx}  % -- or Times --
+
+% Use this to discern DRAFTs from final versions
+%\usepackage{draftcopy}
+%\draftcopySetGrey{0.90}   %   90% = very light grey
+%\draftcopySetScale{1}
+
+%--------------- line and paragraph distances ----------------------%
+\setlength{\parindent}{0em}
+\setlength{\parskip}{\medskipamount}    % distance between paragraphs
+
+% correctly format URLs and email addresses
+\usepackage{url}
+% example for email addresses: \url{foo@bar.com}
+
+% Tools for note taking, ideas...
+\newcommand{\notesubsection}[1][unsorted idea]{%
+\subsection*{#1}%
+\addcontentsline{toc}{subsection}{#1}%
+}
+
+% side note:
+\newcommand{\bemerkung}[1]{\marginpar{\small\textsl{\textsf{#1}}}}
+
+% this adds a little "under construction" icon on the side
+%
+% For this to work you need an "Baustelle.eps" icon. Get it from here:
+%  http://www.net.in.tum.de/teaching/WS04/routing/Baustelle.eps.gz
+\newcommand{\baustelle}[1][]{
+ \marginpar{%
+   \centerline{\includegraphics[scale=0.3]{Baustelle.eps}}
+   {\small\textsl{\textsf{\raggedright #1}}}
+}}
+
+\begin{document}
+
+\title{Weird Machines}
+\author{Federico Scrinzi \\
+  (\texttt{federico.scrinzi@campus.tu-berlin.de})\\[5mm]
+  "`Computer Security Seminar"' , \\
+  Technische Universität Berlin
+}
+  
+\date{WS\,2013/2014 (Version of \today)}
+
+\maketitle
+
+\abstract{Compressed version of content..}
+
+\section{Introduction}
+Here you shall give the motivation and structure of your paper. Answer the
+questions: What is the problem? Why is it a problem? Why is it interesting to
+solve the problem?
+
+\section{Chapter}
+
+\subsection{Subchapter}
+
+\section{Chapter}
+
+Shamir introduced \cite{sham79} the concept of ...
+
+\section{Summary}
+Summarize what our wrote, your findings ...
+
+
+\begin{thebibliography}{12}
+\bibitem[HaKT1 98]{HaKT1 98} \footnote{The bibliography should include all
+used literature. All literature included in the bibliography should be quoted
+at least once in your text.}
+        Michael Harkavy, J. D. Tygar, Hiroaki Kikuchi: {\sl Multi-round 
+        Anonymous Auction Protocols}; 1st IEEE Workshop on Dependable and 
+        Real-Time E-Commerce Systems, 1998.
+\bibitem[Sham\_79]{sham79}
+        Adi Shamir: {\sl How to Share a Secret}; 
+        Communications of the ACM 22/11 (1979), S. 612-613.
+\end{thebibliography}
+\end{document}
+
