@@ -145,7 +145,7 @@ The weird machine presented in this section implements a simplified assembly-lik
 \item Jump-if-not-zero (\texttt{jnz})
 \end{itemize}
 
-Accepted input formats for those instructions are the following:
+Accepted input formats for those instructions are:
 \begin{itemize}
 \item Immediate (e.g.: \texttt{\$0x42})
 \item Direct, the given location contains the value address (e.g.: \texttt{*0xcafebabe})
@@ -175,9 +175,9 @@ The \texttt{add} instruction allows to compute an addition and save the result t
 
 \texttt{add <dest>, <addend1>, <addend2>}
 
-\texttt{<dest>} has to be specified as a direct value, \texttt{<addend1>} as a register value, and \texttt{<addend 2>} as an immediate.
+\texttt{<dest>} has to be specified as a direct value, \texttt{<addend1>} as a register value, and \texttt{<addend 2>} as an immediate value.
 
-The following table shows an example of the conversion from an \texttt{add} instruction to relocation metadata.
+The following is an example of the conversion from an \texttt{add} instruction to relocation metadata.
 
 \begin{tabular}{ l | l }
   \hline
@@ -188,7 +188,7 @@ The following table shows an example of the conversion from an \texttt{add} inst
 
 
 \subsubsection{Jump-if-not-zero}
-\texttt{jne} instructions allow to transfer the flow of execution to another point of the program. It is not easy to implement jumps using relocation entries, as for their original purpose there is no need for the interpreter to jump between relocation entries.
+\texttt{jne} instructions allow to transfer the flow of execution to another point of the program. It is not easy to implement jumps using relocation entries, as for their original purpose there is no need for the interpreter to jump between them.
 
 \paragraph{Building an unconditional jump.}
 The processing of relocation addresses by the RTLD can be summarized as follows:
@@ -203,11 +203,11 @@ while (lm != NULL) {
 }
 \end{lstlisting}
 
-The basic idea for building a jump is to modify \texttt{end} in order to exit the "for loop" prematurely without going on processing the following relocation entries, enter in the "while loop" again but starting from a different \texttt{r}.
+The basic idea for building a jump is to modify \texttt{end} in order to exit the "for loop" prematurely without going on processing the following relocation entries, then enter in the "while loop" again but starting from a different \texttt{r}.
 It is possible to achieve this by exploiting the RTLD behavior. These are the steps that have to be done:
 
 \begin{enumerate}
-\item Change \texttt{lm->prev} to point to the same relocation entry, so that the while loop will process it again later (this, in the end, needs to be reset to the original value)
+\item Change \texttt{lm->prev} to point to the same relocation entry, so the while loop will process it again later (this, in the end, needs to be reset to the original value)
 \item Set \texttt{lm->dyn[DT\_RELA]} to point to the relocation entry of the jump destination
 \item Set \texttt{lm->dyn[DT\_RELASZ]} to the size of the relocation entries from the jump destination on
 \item Change the value of \texttt{end} to exit the for loop
@@ -218,8 +218,8 @@ The following table summarizes the process needed to achieve each point.
 \begin{longtable}{ l | p{0.75\textwidth} }
   \hline
   1 & A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. \\ & E.g.: \texttt{mov *<addr of prev>, \$<addr of link\_map>} \\ \hline \\
-  2-3 & Here there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time and solve again the issues with \texttt{mov} instructions \\ & E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>} \\ \hline \\
-  4 & \texttt{end} is stored on the stack, if ASLR is on its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
+  2-3 & For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions \\ & E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>} \\ \hline \\
+  4 & \texttt{end} is stored on the stack, if ASLR is turned on its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
 address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set end to 0, forcing the loop to exit prematurely: \\
   & \texttt{mov *<addr of next Rela's offset>, \%sym-end mov *<(value overwritten)>, \$0} \\
   \hline
@@ -429,7 +429,7 @@ These observations lead to new questions in the field of trusted systems and, ho
 
 \bibitem{eresi} mayhem: {\sl Understanding Linux ELF RTLD internals}; Phrack 59
 
-\bibitem{html} ELitheeli: {\sl "stupid machines"}; \url{https://github.com/ elitheeli/stupid-machines}
+\bibitem{html} Elitheeli: {\sl "stupid machines"}; \url{https://github.com/ elitheeli/stupid-machines}
 
 \bibitem{cpp_templates} Veldhuizen, T. L.:  {\sl C++ Templates are Turing Complete}; \url{http://ubietylab.net/ubigraph/content/Papers/pdf/CppTuring.pdf}; Indiana University Computer Science.
 \end{thebibliography}
