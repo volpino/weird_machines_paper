@@ -75,16 +75,16 @@ Unexpected computation means not only the execution of unintended instructions o
 
 
 \section{Introduction}
-Exploits are a proof-by-construction of unexpected computation. Through an exploit, what an attacker wants usually to achieve is to make the target machine do something that was not anticipated. Classically this means deceiving the system into executing arbitrary code, but we will see that modern systems offer many different hidden ways of achieving computation.
+Exploits are a proof-by-construction of unexpected computation. Through an exploit, what an attacker wants usually to achieve is to make the target machine do something that was not anticipated. Classically, this means deceiving the system into executing arbitrary code, but we will see that modern systems offer many different hidden ways of achieving computation.
 
-In the last decade there was a major change in security analysis regarding this aspect: the threat model needed to be extended from a simplistic approach based on "malicious code" to a more comprehensive one based on "malicious computation". \cite{hund}
+In the last decade there was a major change in security analysis regarding this aspect: the threat model needed to be extended, from a simplistic approach based on "malicious code" to a more comprehensive one based on "malicious computation". \cite{hund}
 The classic paper "Smashing the Stack for Fun and Profit" by Aleph One \cite{smashing} illustrates one of the first steps in the conversion of an input data flow into altered program control flow. Thus, not only code but also data may be a potential threat: data processing changes the state of the machine analyzing it, thus one could think of specially crafted inputs as a possible way to achieve computation.
 
-Modern systems hide a plethora of weird machines that might be exploited, the new goal for security analysts is to find them.   Turing-complete machines are hidden in many systems: CSS3 combined with HTML \cite{}, C++ templates \cite{} or the Game of Life are proven to satisfy those properties. These are just a few examples of machines driven by what is not normally considered as executable code.
+Modern systems hide a plethora of weird machines that might be exploited, the new goal for security analysts is to find them.   Turing-complete machines are hidden in many systems: CSS3 combined with HTML \cite{html}, C++ templates \cite{cpp_templates} or the Game of Life are proven to satisfy those properties. These are just a few examples of machines driven by what is not normally considered as executable code.
 
-Therefore, security research's core subjects of study-trust and trustworthiness in computing systems are now faced with new questions, such as "What execution paths can programs be trusted to not take under any circumstances, no matter what the inputs?" or "Which properties of inputs can a particular security system verify, and which are beyond its limits?". \cite{bratus}
+Therefore, security research's core subjects of study-trust and trustworthiness in computing systems are now faced with new questions, such as "What execution paths can programs be trusted to not take under any circumstances, no matter what the inputs?" or "Which properties of inputs can a particular security system verify, and which are beyond its limits?" \cite{bratus}.
 
-Exploits based on weird machines are harder to detect than classical ones and hidden, unexpected computation can be a really dangerous threat. For that reason higher and higher consideration should be given to the study of this field, to reveal new potential hazard and build more secure systems.
+%Exploits based on weird machines are harder to detect than classical ones and hidden, unexpected computation can be a really dangerous threat. For that reason higher and higher consideration should be given to the study of this field, to reveal new potential hazard and build more secure systems.
 
 
 \section{Weird machine \#1: ELF metadata construction}
@@ -92,7 +92,7 @@ Exploits based on weird machines are harder to detect than classical ones and hi
 This section summarizes the work done by R. Shapiro, S. Bratus and S. W. Smith \cite{elf_machine} in building a weird machine that exploits ELF relocation metadata to do computation.
 
 \subsection{Introduction to ELF}
-The Executable and Linkable Format (ELF) is a file format for object code, executables and shared libraries commonly used in many Unix-like systems such as Linux, *BSD and Solaris.
+The Executable and Linkable Format (ELF) is a file format for object code, executables and shared libraries. It is commonly used in many Unix-like systems such as Linux, *BSD and Solaris.
 Each ELF file is composed by an ELF Header (metadata) followed by the actual data.
 
 There are three main types of object files:
@@ -111,16 +111,16 @@ The loading and execution of a program can be summarized in the following steps:
 \item The execution jumps the executable's entry-point (usually \texttt{\_start})
 \end{enumerate}
 
-\subsubsection*{Addresses relocation} 
+\subsubsection{Addresses relocation} 
 For our purposes the executable's metadata and the patching of the memory by the interpreter is particularly important, as the weird machine presented in this section is based on those primitives. We will go a bit more in detail in this step.
 
 Unlike executables, when shared libraries are being built, the linker can not assume a known load address for their code. The reason for this is simple: each program can use any number of shared libraries, and there is simply no way to know in advance where any given shared library will be loaded in the process's virtual memory. This problem is solved by the RTLD.
 
 The true entry point of the interpreter is \texttt{\_dl\_start}, this function is called by the kernel from the \texttt{start\_thread()} kernel function. At the end of the dynamic linking process, the starting function of the binary, the \texttt{\_start()} point, is called. \cite{eresi}
 
-It is important to remark that each object in the dynamic linker is described by a \texttt{link\_map} structure. Those structures are only created at runtime and contain different kind of information, such as: the base address at which the ELF object was loaded, the virtual address of all the ELF object's dynamic table entries and pointers to other loaded link map structures. All the link map structures form a doubly linked list so from every structure we can find information on any other loaded ELF object by traversing the list.
+It is important to remark that every object in the dynamic linker is described by a \texttt{link\_map} structure. Those structures are only created at runtime and contain different kind of information, such as: the base address at which the ELF object was loaded, the virtual address of all the ELF object's dynamic table entries or pointers to other loaded link map structures. All the \texttt{link\_map} structures form a doubly linked list so from every structure we can find information on any other loaded ELF object by traversing the list.
 
-Symbols are a way to assign mnemonic names to addresses. ELF provides two different symbol tables: \texttt{.symtab} and \texttt{.dynsym}. \texttt{.dynsym} is just a smaller version of the symtab that only contains global symbols, it contains information required at runtime such as the names of the needed libraries. Symbol metadata is memorized using \texttt{Elf64\_Sym} structures. This kind of metadata is used in the following construction to build registers: symbols with 8 byte values are used, type must be set to \texttt{FUNC} so it is treated as a regular symbol. An example is the following:
+Symbols are a way to assign mnemonic names to addresses. ELF provides two different symbol tables: \texttt{.symtab} and \texttt{.dynsym}. \texttt{.dynsym} is just a smaller version of the \texttt{.symtab} that only contains global symbols, it contains information required at runtime such as the names of the needed libraries. Symbol metadata is memorized using \texttt{Elf64\_Sym} structures. This kind of metadata is used in the following construction to build registers: symbols with 8 byte values are used, type must be set to \texttt{FUNC} so it is treated as a regular symbol. An example is the following:
 \texttt{\{name=foo, value=0xb0000000, type=FUNC, shndx=1, size=8\}}
 
 \texttt{.rela.dyn} and \texttt{.rela.plt} are two tables that contain relocation entries using \texttt{Elf64\_Rela} structures. Relocation entries are used to patch the table with the locations of imported library functions at runtime. The difference between the two tables is that \texttt{.rela.plt} entries are typically processed lazily during dynamic linking while \texttt{.rela.dyn} relocation entries are processed during load time, just before the RTLD passes control to the executable.
@@ -251,7 +251,7 @@ This document will not explain implementation challenges and constraints, but, i
 This weird machine is heavily dependent upon ELF, probably other executables format can be exploited in the same way. For this reason also PE (Windows) and Mach-O (OSX) are a subject of future research.
 The relocation-metadata machine also shows that executable headers must be taken into account when studying the security of a system and are worth to be analyzed in detail by antivirus systems.
 
-To better explain how an attacker could exploit this weird machine the original authors built a root shell backdoor hidden in the relocation metadata of a \texttt{ping} executable. It is important to remark that: 
+To better explain how an attacker could exploit this weird machine the original authors built a root shell backdoor hidden in the relocation metadata of a \texttt{ping} executable \cite{ping_elf}. It is important to remark that: 
 \begin{itemize}
 \item Ping runs with the SUID bit but drops privileges 
 \item The optional \texttt{--type} command-line argument is passed to the \texttt{strcasecmp} function.
@@ -265,46 +265,173 @@ It is interesting to notice that is possible to achieve this even without all th
 The goal of the weird machine presented in this section is to exploit the MMU to do computation. This suggests that we could consider view the internal logic of page fault and memory translation as the finite automaton of a Turing machine and the memory as holding its "tape", by potentially creating a kind of a closed loop of memory accesses.
 Interrupt handling and address translations are controlled using registers and tables. Moreover, when a page fault occurs the information about the trap is saved on the stack. By setting the address of the trap handler to cause another fault we will end up with the processor continuously dispatching page-faults. If the tables controlling this behavior are crafted in the right way, the side effects of the interrupt handling form a Turing-complete one-instruction computer.
 
-\subsection{Introduction to MMU and traps handling}
+\subsection{Introduction to MMU and trap handling}
+
+First of all some basic definition are presented.
+
+\paragraph{MMU: } Memory management unit, is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
+
+\paragraph{TSS: } Task state segment, is a special structure which holds information about a task. Specifically it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
+
+\paragraph{TR: } Task register, it is a register that contains the selector for the "current" task state segment. Whenever the CPU switches to a different task it will save its state to the TSS stored in TR.
+
+\paragraph{IDT: } Interrupt descriptor table, it is a data structure used by the CPU to determine the correct response to interrupts and traps. Every interrupt handler is a pointer to a TSS descriptor in the GDT.
+
+\paragraph{GDT: } Global Descriptor Table, it contains segment descriptors. The CPU addresses memory through an index into the GDT, called \texttt{segment selector} and an offset into the resulting interval.
+
+\paragraph{Page fault: } A page fault occurs when a program requests an address on a page that is not in the current set of memory resident pages. Usually the OS tries to handle the page fault calling the specific handler in the IDT. It should make the required page accessible at a location in physical memory or terminate the program in the case of an illegal access.
+
+
+\subsubsection{X86 interrupt handling}
+
+The following summarizes how an interrupt is handled by the OS on x86.
+
+\begin{enumerate}
+\item An interrupt is raised
+\item The current task is saved in the TSS pointed by the TR
+\item The IDT is looked up for the right handler for the interrupt (every type of interrupt has a different handler). The handler is a pointer to a TSS descriptor in the GDT
+\item The new TSS is loaded to handle the fault
+\item The stack pointer is decremented by 4 and the information about the interrupt is written on the stack by the CPU
+\end{enumerate}
 
 \subsection{Weird machine primitives}
 
-The unique instruction we want to build is called \texttt{movdbz} that stays for "move-branch-if-zero-or-decrement".
+The only instruction we need to build is called \texttt{movdbz} that stays for "move-branch-if-zero-or-decrement".
 
 \texttt{movdbz <dest> <source> <branch>}
 
-This construction is proved to be Turing complete, its behavior is summarized in the following list:
+This construction is proved to be Turing complete \cite{mmu_machine}, its behavior is summarized as follows:
 \begin{enumerate}
 \item \texttt{source} is loaded and decremented
 \item if the decrementation did not cause an underflow the result is stored in \texttt{dest} and computation flow goes on to the next instruction
 \item otherwise, if the decrementation caused an undeflow, 0 is stored in \texttt{dest} and the program flow jumps to \texttt{branch}
 \end{enumerate}
 
+For the construction of the weird machine the following components are needed:
+\begin{itemize}
+\item one specially crafted GDT
+\item one TSS for each instruction
+\item one page table per instruction (the memory is remapped, depending on the instruction)
+\end{itemize}
+
+The original authors built a compiler that converts \texttt{movdbz} instructions to these components. \cite{trapcc}
+
+This is the pseudocode of the algorithm we want to execute, with a brief explanation of how to achieve this using only the MMU:
+\begin{lstlisting}
+Label:        # jump here through a PF or a DF
+  X = Y       # save the old TSS state and load a new one
+  if X < 4:   # try to decrement SP
+    goto B    # if it caused an underflow we get a DF (jump)
+  else:
+    X -= 4    # SP decremented successfully
+    goto A    # EIP will cause another PF
+\end{lstlisting}
+
+
 \subsection{A Turing complete machine based on Page Faults}
 
+The following schema summarizes the lifecycle of the weird machine.
+
+\begin{enumerate}
+\item A page fault (or a double fault) is raised
+\item The page fault (or the double fault) handler is looked-up in the IDT. A task switch is made: the current TSS is saved in the descriptor pointed by the TR, a new TSS is loaded.
+\item The TSS contains, among other data, the registers state. The most interesting registers for the weird machine are ESP and CR3 (pointer to the page table). The first one plays the role of \texttt{X} in the pseudocode while the latter is used to remap the same virtual addresses into different physical addresses by using a different page table.
+\item The CPU tries to decrement ESP in order to write information about the fault on the stack. If ESP is greater-or-equal than 4 the operation succeeds, but this will raise another page fault as EIP points to an invalid address. Vice-versa, if ESP is lower than 4 we obtain an underflow that leads to a double fault.
+\item The "execution" goes back to point 1. It is however important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
+\end{enumerate}
+
+This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. This are some examples:
+\begin{itemize}
+\item the CR3 register is not changed when saving the TSS state, so that each instruction has its own page table.
+\item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
+\item It is not possible to switch to the same task pointed by the TR
+\item triple faults cause the machine to reboot, so they have to be avoided
+\end{itemize}
+
+
 \subsection{Conclusions}
+This weird machine shows a new and completely unexpected way to achieve computation.
+It is important to remark that for executing "instructions" on this machine we do not actually compute any real instruction on the CPU. Everything is handled by the MMU. 
+
+An interesting fact is that it is possible to switch between the weird machine and real instruction very easily, the only thing we need to do is to set EIP properly, in order not to cause a page fault. A proof of this is given by the original authors that built a "Game of Life" that runs computation on the MMU but switches to real instructions to display the gliders in the terminal.
 
 
 \section{Comparison of weird machines \#1 and \#2}
 
+The two weird machines presented in this document are very different but both achieve the same goal: unexpected computation in a totally unanticipated way. This opens to new techniques of hiding malware and new approaches to malware analysis.
+
+A brief comparison of advantages and disadvantages of each machine is presented in the following paragraphs.
+
 \subsection{Advantages of the given constructions}
+
+\begin{longtable}{ p{0.4\textwidth} | p{0.4\textwidth} }
+\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline \\
+\begin{itemize}
+\item Metadata is not usually considered harmful, most defenses focus on actual code
+\item Metadata is not always considered when signing executables
+\item Not influenced by ASLR
+\item The code is untouched
+\item The weird machine metadata is still well formed, it does not fail any sanity check
+\item ELF metadata is extremely powerful, it can locate stack and all mapped libraries, redirect library calls or even perform function calls
+\end{itemize}
+&
+\begin{itemize}
+\item No native instruction needed for computation
+\item Can be extremely difficult to detect and to analyze what it is actually computing
+\item Possible to switch between weird machine and real instructions almost transparently
+\item Exploits only hardware features, no further logic needed
+\end{itemize} \\
+
+\end{longtable}
+
 
 \subsection{Limitations of the given constructions}
 
+\begin{longtable}{ p{0.4\textwidth} | p{0.4\textwidth} }
+\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline \\
+\begin{itemize}
+\item Runs naive instructions, computation is not so hidden
+\item Implementation specific for a version of \emph{glibc}, could easily break with other versions
+\item Not possible to switch between weird machine and "normal" execution
+\end{itemize}
+&
+\begin{itemize}
+\item Needs kernel access to setup the components (GDT, IDT, TSSs, etc...)
+\item Can only use the \texttt{movdbz} instruction, which is very minimalistic and not practical
+\item Because of implementation issues it can only work with ESP of TSSs aligned across pages. This lead to a very limited coverage of physical memory
+\item Need to insert dummy instructions to not have triple faults 
+\end{itemize} \\
+
+\end{longtable}
 
 
 \section{Conclusions}
 
+The study of trustworthiness of computing systems is typically predicated on assurance regarding the types of computation these systems can and cannot be driven, this machines shows that there are many grey areas in this field that need more work and analysis.
+These results demonstrate that special crafting of ELF metadata can lead to the execution of instruction on the CPU and modifications of the memory, moreover the unorthodox use of MMU features in modern processors can result in powerful computation, driven entirely by in-memory descriptor tables without dispatching any native instructions.
+
+These observations lead to new questions in the field of trusted systems and, hopefully, encourage new efforts in research, in order to enumerating and characterizing other unexpected computational environments.
+
 \begin{thebibliography}{12}
+\bibitem{elf_machine} R. Shapiro, S. Bratus, S. W. Smith {\sl "Weird Machines" in ELF: A Spotlight on the Underappreciated Metadata}; WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
+
+\bibitem{mmu_machine} J. Bangert, S. Bratus, R. Shapiro, S. W. Smith {\sl The Page-Fault Weird Machine: Lessons in Instruction-less Computation};  WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
+
+\bibitem{bratus} S. Bratus, M. E. Locasto, M. L. Patterson, L. Sassaman, A. Shubina: {\sl Exploit Programming From Buffer Overflows to "Weird Machines" and Theory of Computation}
+
+\bibitem{trapcc} trapcc - computing with traps \url{https://github.com/jbangert/trapcc}
+
+\bibitem{ping_elf} elf-bf-tools - \url{https://github.com/bx/elf-bf-tools}
+
 \bibitem{hund} Hund, R., Holz T., Freiling, F. C.: {\sl Return-oriented rootkits: bypassing kernel code integrity protection mechanisms}; In Proceedings of the 18th USENIX Security Symposium (2009), USENIX Association, pp. 383–398.
 
 \bibitem{smashing} Aleph One: {\sl Smashing The Stack For Fun And Profit}; Phrack 49
 
-\bibitem{bratus} S. Bratus, M. E. Locasto, M. L. Patterson, L. Sassaman, A. Shubina: {\sl Exploit Programming From Buffer Overflows to "Weird Machines" and Theory of Computation}
-
-\bibitem{elf_machine} R. Shapiro, S. Bratus, S. W. Smith {\sl "Weird Machines" in ELF: A Spotlight on the Underappreciated Metadata}; WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
-
 \bibitem{eresi} mayhem: {\sl Understanding Linux ELF RTLD internals}; Phrack 59
+
+\bibitem{html} ELitheeli: {\sl "stupid machines"}; \url{https://github.com/ elitheeli/stupid-machines}
+
+\bibitem{cpp_templates} Veldhuizen, T. L.:  {\sl C++ Templates are Turing Complete}; \url{http://ubietylab.net/ubigraph/content/Papers/pdf/CppTuring.pdf}; Indiana University Computer Science.
 \end{thebibliography}
 \end{document}
 
