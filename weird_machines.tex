@@ -219,18 +219,19 @@ The following table summarizes the process needed to achieve each point.
   \hline
   1 & A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. \\ & E.g.: \texttt{mov *<addr of prev>, \$<addr of link\_map>} \\ \hline \\
   2-3 & For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions \\ & E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>} \\ \hline \\
-  4 & \texttt{end} is stored on the stack, if ASLR is turned on its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
-address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set end to 0, forcing the loop to exit prematurely: \\
+  4 & \texttt{end} is stored on the stack. If ASLR is turned on, its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
+address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set \texttt{end} to 0, forcing the loop to exit prematurely: \\
   & \texttt{mov *<addr of next Rela's offset>, \%sym-end mov *<(value overwritten)>, \$0} \\
   \hline
 \end{longtable}
 
-\paragraph{Conditional branch.} To move from an unconditional branch to a conditional one there is the need of a bit more instructions. For this feature we need to exploit the RTLD behavior with \texttt{IFUNC} type symbols. These structures are processed in two different ways, depending on the value of the \texttt{shndx} field. (1) If it is not 0, then the RTLD treats the symbol as an indirect function, calling the function it points to and using the value returned by the indirect function. (2) If the \texttt{shndx} field is zero, then that symbol's value is used directly.
+\paragraph{Conditional branch.} To move from an unconditional branch to a conditional one there is the need of a bit more logic. For this feature we need to exploit the RTLD behavior with \texttt{IFUNC} type symbols: these structures are processed in two different ways, depending on the value of the \texttt{shndx} field. (1) If it is not 0, then the RTLD treats the symbol as an indirect function, calling the function it points to and using the returned value. (2) If the \texttt{shndx} field is zero, then that symbol's value is used directly.
+
 For achieving our goal we need a special symbol (that we call \texttt{sym-zero}) that is of type \texttt{IFUNC} and points to a function that returns zero. Then we need the following instructions:\\
 \texttt{mov *<addr of sym-zero shndx>, \$<test val>} \\
 \texttt{add *<addr of end>, \%sym-zero, \$0}
 
-In this way if the value being tested is zero, then also \texttt{\%sym-zero} will be treated as zero (because of the \texttt{IFUNC} processing), so \texttt{end} will be zero and the for loop will exit. Otherwise \texttt{end} will be greater than zero and the following instruction, that resets \texttt{end} to its original value, will be executed and the computation will go on without branching.
+In this way if the value being tested is zero, then also \texttt{\%sym-zero} will be treated as zero (because of the \texttt{IFUNC} processing), so \texttt{end} will be zero and the for loop will exit. Otherwise \texttt{end} will be greater than zero, so the following instruction, that resets \texttt{end} to its original value, will be executed and the computation will go on without branching.
 
 
 \subsection{A Turing complete machine inside ELF}
@@ -239,16 +240,17 @@ Using the given primitives it is possible to achieve computation using only ELF 
 
 The original authors of the paper built a Brainfuck to ELF-metadata compiler to demonstrate how to practically awake the hidden weird machine in the RTLD.
 
-This document will not explain implementation challenges and constraints, but, if the reader is interested, he can go into more detail by reading the original paper. However, here there are some points that is important to keep in mind when implementing this weird machine:
+This document will not explain implementation challenges and constraints, but, if the reader is interested, he can go into more detail by reading the original paper \cite{elf_machine}. However, here there are some points that is important to keep in mind when implementing this weird machine:
 \begin{itemize}
-\item For implementing conditional branching there is the need to know the base address of the RTLD. This is not trivial
-\item Existing metadata should not be corrupted, we want the final executable to still run as normal
-\item The interpreter runs some sanity checks on the metadata, they should not corrupt the weird machine instructions
+\item For implementing conditional branching there is the need to know the base address of the RTLD. This is not trivial.
+\item Existing metadata should not be corrupted, we want the final executable to still run as normal.
+\item The interpreter runs some sanity checks on the metadata, they should not corrupt the weird machine instructions.
 \end{itemize}
 
 
 \subsection{Where to go from here?}
 This weird machine is heavily dependent upon ELF, probably other executables format can be exploited in the same way. For this reason also PE (Windows) and Mach-O (OSX) are a subject of future research.
+
 The relocation-metadata machine also shows that executable headers must be taken into account when studying the security of a system and are worth to be analyzed in detail by antivirus systems.
 
 To better explain how an attacker could exploit this weird machine the original authors built a root shell backdoor hidden in the relocation metadata of a \texttt{ping} executable \cite{ping_elf}. It is important to remark that: 
@@ -257,21 +259,21 @@ To better explain how an attacker could exploit this weird machine the original 
 \item The optional \texttt{--type} command-line argument is passed to the \texttt{strcasecmp} function.
 \end{itemize}
 
-To get ping to execute arbitrary programs as root, we have to insert relocation metadata to override the call to \texttt{setuid()} to not do anything useful (so privileges are not dropped) and the call to \texttt{strcasecmp} to launch a \texttt{execl} instead. It turns out that it can be implemented using nine relocation entries and one symbol table entry and without making any changes to the executable segments of ping.
+To get ping to execute arbitrary programs as root, we have to insert relocation metadata to override the call to \texttt{setuid()} to not do anything useful (so privileges are not dropped) and the call to \texttt{strcasecmp} to launch a \texttt{execl} instead. It turns out that it can be implemented using nine relocation entries and one symbol table entry, without making any changes to the executable segments of ping.
 
-It is interesting to notice that is possible to achieve this even without all the power of Turing-completeness of the machine, so an attacker might need very little power to exploit weird machines.
+It is interesting to notice that is possible to achieve this even without all the power of Turing-completeness, hence an attacker might need very little power to exploit weird machines.
 
 \section{Weird machine \#2: Page fault driven computation}
-The goal of the weird machine presented in this section is to exploit the MMU to do computation. This suggests that we could consider view the internal logic of page fault and memory translation as the finite automaton of a Turing machine and the memory as holding its "tape", by potentially creating a kind of a closed loop of memory accesses.
+The goal of the weird machine presented in this section is to exploit the MMU to do computation. This suggests that we could consider the internal logic of page fault and memory translation as the finite automaton of a Turing machine and the memory as holding its "tape", by potentially creating a kind of a closed loop of memory accesses.
 Interrupt handling and address translations are controlled using registers and tables. Moreover, when a page fault occurs the information about the trap is saved on the stack. By setting the address of the trap handler to cause another fault we will end up with the processor continuously dispatching page-faults. If the tables controlling this behavior are crafted in the right way, the side effects of the interrupt handling form a Turing-complete one-instruction computer.
 
 \subsection{Introduction to MMU and trap handling}
 
 First of all some basic definition are presented.
 
-\paragraph{MMU: } Memory management unit, is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
+\paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
 
-\paragraph{TSS: } Task state segment, is a special structure which holds information about a task. Specifically it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
+\paragraph{TSS: } Task state segment, it is a special structure which holds information about a task. Specifically it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
 
 \paragraph{TR: } Task register, it is a register that contains the selector for the "current" task state segment. Whenever the CPU switches to a different task it will save its state to the TSS stored in TR.
 
@@ -300,7 +302,7 @@ The only instruction we need to build is called \texttt{movdbz} that stays for "
 
 \texttt{movdbz <dest> <source> <branch>}
 
-This construction is proved to be Turing complete \cite{mmu_machine}, its behavior is summarized as follows:
+This construction is proven to be Turing complete \cite{mmu_machine}, its behavior is summarized as follows:
 \begin{enumerate}
 \item \texttt{source} is loaded and decremented
 \item if the decrementation did not cause an underflow the result is stored in \texttt{dest} and computation flow goes on to the next instruction
