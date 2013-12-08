@@ -123,7 +123,7 @@ It is important to remark that every object in the dynamic linker is described b
 Symbols are a way to assign mnemonic names to addresses. ELF provides two different symbol tables: \texttt{.symtab} and \texttt{.dynsym}. \texttt{.dynsym} is just a smaller version of the \texttt{.symtab} that only contains global symbols, it contains information required at runtime such as the names of the needed libraries. Symbol metadata is memorized using \texttt{Elf64\_Sym} structures. This kind of metadata is used in the following construction to build registers: symbols with 8 byte values are used, type must be set to \texttt{FUNC} so it is treated as a regular symbol. An example is the following:
 \texttt{\{name=foo, value=0xb0000000, type=FUNC, shndx=1, size=8\}}
 
-\texttt{.rela.dyn} and \texttt{.rela.plt} are two tables that contain relocation entries using \texttt{Elf64\_Rela} structures. Relocation entries are used to patch the table with the locations of imported library functions at runtime. The difference between the two tables is that \texttt{.rela.plt} entries are typically processed lazily during dynamic linking while \texttt{.rela.dyn} relocation entries are processed during load time, just before the RTLD passes control to the executable.
+\texttt{.rela.dyn} and \texttt{.rela.plt} are two tables that contain relocation entries composed by structures of type \texttt{Elf64\_Rela}. Relocation entries are used to patch the table with the locations of imported library functions at runtime. The difference between the two tables is that \texttt{.rela.plt} entries are typically processed lazily during dynamic linking while \texttt{.rela.dyn} relocation entries are processed during load time, just before the RTLD passes control to the executable.
 
 Three types of relocation entries are interesting for constructing the weird machine. They are shown in the following table, their behavior is summarized using a C-like code where \texttt{r} is the relocation entry, \texttt{s} is the corresponding symbol and \texttt{base} is the base address of the ELF object.
 
@@ -273,7 +273,7 @@ First of all some basic definition are presented.
 
 \paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
 
-\paragraph{TSS: } Task state segment, it is a special structure which holds information about a task. Specifically it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
+\paragraph{TSS: } Task state segment, it is a special structure which holds information about a task. Specifically, it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
 
 \paragraph{TR: } Task register, it is a register that contains the selector for the "current" task state segment. Whenever the CPU switches to a different task it will save its state to the TSS stored in TR.
 
@@ -298,14 +298,14 @@ The following summarizes how an interrupt is handled by the OS on x86.
 
 \subsection{Weird machine primitives}
 
-The only instruction we need to build is called \texttt{movdbz} that stays for "move-branch-if-zero-or-decrement".
+The only instruction we need to build is called \texttt{movdbz}, that stays for "move-branch-if-zero-or-decrement".
 
 \texttt{movdbz <dest> <source> <branch>}
 
 This construction is proven to be Turing complete \cite{mmu_machine}, its behavior is summarized as follows:
 \begin{enumerate}
 \item \texttt{source} is loaded and decremented
-\item if the decrementation did not cause an underflow the result is stored in \texttt{dest} and computation flow goes on to the next instruction
+\item if the decrementation did not cause an underflow the result is stored in \texttt{dest} and the computation flow goes on to the next instruction
 \item otherwise, if the decrementation caused an undeflow, 0 is stored in \texttt{dest} and the program flow jumps to \texttt{branch}
 \end{enumerate}
 
@@ -337,9 +337,9 @@ The following schema summarizes the lifecycle of the weird machine.
 \begin{enumerate}
 \item A page fault (or a double fault) is raised
 \item The page fault (or the double fault) handler is looked-up in the IDT. A task switch is made: the current TSS is saved in the descriptor pointed by the TR, a new TSS is loaded.
-\item The TSS contains, among other data, the registers state. The most interesting registers for the weird machine are ESP and CR3 (pointer to the page table). The first one plays the role of \texttt{X} in the pseudocode while the latter is used to remap the same virtual addresses into different physical addresses by using a different page table.
-\item The CPU tries to decrement ESP in order to write information about the fault on the stack. If ESP is greater-or-equal than 4 the operation succeeds, but this will raise another page fault as EIP points to an invalid address. Vice-versa, if ESP is lower than 4 we obtain an underflow that leads to a double fault.
-\item The "execution" goes back to point 1. It is however important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
+\item The TSS contains, among other data, the registers state. The most interesting registers for the weird machine are ESP and CR3 (pointer to the page table). The first one plays the role of \texttt{X} in the pseudocode while the latter is used to remap the same virtual addresses into different physical addresses, by using a different page table.
+\item The CPU tries to decrement ESP, in order to write information about the fault on the stack. If ESP is greater-or-equal than 4 the operation succeeds, however, this will raise another page fault as EIP points to an invalid address. Vice-versa, if ESP is lower than 4 we obtain an underflow that leads to a double fault.
+\item The "execution" goes back to point 1. It is hence important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
 \end{enumerate}
 
 This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. This are some examples:
@@ -347,15 +347,15 @@ This description, however, is a little simplified. There are many constraints an
 \item the CR3 register is not changed when saving the TSS state, so that each instruction has its own page table.
 \item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
 \item It is not possible to switch to the same task pointed by the TR
-\item triple faults cause the machine to reboot, so they have to be avoided
+\item triple faults cause the machine to reboot, so they must be avoided
 \end{itemize}
 
 
 \subsection{Conclusions}
 This weird machine shows a new and completely unexpected way to achieve computation.
-It is important to remark that for executing "instructions" on this machine we do not actually compute any real instruction on the CPU. Everything is handled by the MMU. 
+It is important to remark that, for executing "instructions" on this machine, we do not actually compute any real instruction on the CPU. Everything is handled by the MMU. 
 
-An interesting fact is that it is possible to switch between the weird machine and real instruction very easily, the only thing we need to do is to set EIP properly, in order not to cause a page fault. A proof of this is given by the original authors that built a "Game of Life" that runs computation on the MMU but switches to real instructions to display the gliders in the terminal.
+An interesting fact is that it is possible to switch between the weird machine and real instructions very easily: the only thing we need to do is to set EIP properly, in order not to cause a page fault. A proof of this is given by the original authors, as they built a "Game of Life" that runs computation on the MMU but switches to real instructions to display the gliders in the terminal.
 
 
 \section{Comparison of weird machines \#1 and \#2}
@@ -392,7 +392,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \begin{longtable}{ p{0.4\textwidth} | p{0.4\textwidth} }
 \bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline \\
 \begin{itemize}
-\item Runs naive instructions, computation is not so hidden
+\item Runs native instructions, computation is not so hidden
 \item Implementation specific for a version of \emph{glibc}, could easily break with other versions
 \item Not possible to switch between weird machine and "normal" execution
 \end{itemize}
@@ -409,7 +409,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 
 \section{Conclusions}
 
-The study of trustworthiness of computing systems is typically predicated on assurance regarding the types of computation these systems can and cannot be driven, this machines shows that there are many grey areas in this field that need more work and analysis.
+The study of trustworthiness of computing systems is typically predicated on assurance regarding the types of computation these systems can and cannot be driven: this machines show that there are many grey areas in this field that need more work and analysis.
 These results demonstrate that special crafting of ELF metadata can lead to the execution of instruction on the CPU and modifications of the memory, moreover the unorthodox use of MMU features in modern processors can result in powerful computation, driven entirely by in-memory descriptor tables without dispatching any native instructions.
 
 These observations lead to new questions in the field of trusted systems and, hopefully, encourage new efforts in research, in order to enumerating and characterizing other unexpected computational environments.
