@@ -68,7 +68,7 @@
 \maketitle
 
 \abstract{
-What are exploits in fact? It is possible to define them as programs that run on an unanticipated computational structure, performing unexpected computation. Buffer overflows, format string overflows or SQL injections are just some classical examples of vulnerabilities that allow to achieve this goal. It is possible to see exploits for this flaws as input data used as bytecode on some kind of virtual machine. We will call this class of peculiar VMs "Weird machines".
+What are exploits in fact? It is possible to define them as programs that run on an unanticipated computational structure, performing unexpected computation. Buffer overflows, uncontrolled format strings or SQL injections are just some classical examples of vulnerabilities that allow to achieve this goal. It is possible to see exploits for these flaws as input data used as bytecode on some kind of virtual machine. We will call this class of peculiar VMs \emph{weird machines}.
 
 Unexpected computation means not only the execution of unintended instructions on the CPU but can be achieved also using Turing complete machines hidden in the target. This paper will present two examples of weird machines: the first based on ABI metadata while the second on the MMU.
 }
@@ -77,8 +77,8 @@ Unexpected computation means not only the execution of unintended instructions o
 \section{Introduction}
 Exploits are a proof-by-construction of unexpected computation. Through an exploit, what an attacker wants usually to achieve is to make the target machine do something that was not anticipated. Classically, this means deceiving the system into executing arbitrary code, but we will see that modern systems offer many different hidden ways of achieving computation.
 
-In the last decade there was a major change in security analysis regarding this aspect: the threat model needed to be extended, from a simplistic approach based on "malicious code" to a more comprehensive one based on "malicious computation". \cite{hund}
-The classic paper "Smashing the Stack for Fun and Profit" by Aleph One \cite{smashing} illustrates one of the first steps in the conversion of an input data flow into altered program control flow. Thus, not only code but also data may be a potential threat: data processing changes the state of the machine analyzing it, thus one could think of specially crafted inputs as a possible way to achieve computation.
+In the last decade there was a major change in security analysis regarding this aspect: the threat model needed to be extended, from a simplistic approach based on "malicious code" to a more comprehensive one based on "malicious computation" \cite{hund}. 
+The classic paper "Smashing the Stack for Fun and Profit" by Aleph One \cite{smashing} illustrates one of the first steps in the conversion of an input data flow into altered program control flow. Thus, not only code but also data may be a potential threat: data processing changes the state of the machine analyzing it, thus one could think of specially crafted inputs as a possible way to achieve computation \cite{noncontroldata}.
 
 Modern systems hide a plethora of weird machines that might be exploited, the new goal for security analysts is to find them.   Turing-complete machines are hidden in many systems: CSS3 combined with HTML \cite{html}, C++ templates \cite{cpp_templates} or the Game of Life are proven to satisfy those properties. These are just a few examples of machines driven by what is not normally considered as executable code.
 
@@ -125,8 +125,9 @@ Symbols are a way to assign mnemonic names to addresses. ELF provides two differ
 
 \texttt{.rela.dyn} and \texttt{.rela.plt} are two tables that contain relocation entries composed by structures of type \texttt{Elf64\_Rela}. Relocation entries are used to patch the table with the locations of imported library functions at runtime. The difference between the two tables is that \texttt{.rela.plt} entries are typically processed lazily during dynamic linking while \texttt{.rela.dyn} relocation entries are processed during load time, just before the RTLD passes control to the executable.
 
-Three types of relocation entries are interesting for constructing the weird machine. They are shown in the following table, their behavior is summarized using a C-like code where \texttt{r} is the relocation entry, \texttt{s} is the corresponding symbol and \texttt{base} is the base address of the ELF object.
+Three types of relocation entries are interesting for constructing the weird machine, they are shown in Table \ref{r_entries}.
 
+\begin{table}
 \begin{tabular}{ l | l }
   \hline
   \texttt{R\_X86\_64\_COPY} (COPY) & \texttt{memcpy(r.offset,s.value,s.size)} \\
@@ -134,6 +135,9 @@ Three types of relocation entries are interesting for constructing the weird mac
   \texttt{R\_X86\_64\_RELATIVE} (RELATIVE) & \texttt{*(base+r.offset)=r.addend+base} \\
   \hline
 \end{tabular}
+  \caption{ELF relocation entries that the weird machine uses. Their meaning is presented in C-like syntax where \texttt{r} is the relocation entry, \texttt{s} is the corresponding symbol and \texttt{base} is the base address of the ELF object.}
+  \label{r_entries}
+\end{table}
 
 
 \subsection{Weird machine primitives}
@@ -159,8 +163,9 @@ The \texttt{mov} instruction allows to copy a value from a source to a destinati
 
 \texttt{mov <dest>, <value>}
 
-\texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. The following table shows two examples of the conversion from a \texttt{mov} instruction to relocation metadata.
+\texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. Figure \ref{mov_table} shows two examples of relocation entries that form a \texttt{mov} instruction.
 
+\begin{figure}
 \begin{tabular}{ l | l }
   \hline
   \texttt{mov *0xbeef0000, \$0x04} & \texttt{\{type=RELATIVE, offset=0xbeef0000, symbol=0,} \\ &  \texttt{addend=0x04\}} \\
@@ -168,23 +173,29 @@ The \texttt{mov} instruction allows to copy a value from a source to a destinati
   \texttt{mov *0xbeef0000, [\%foo]} & \texttt{\{type=COPY, offset=0xbeef0000, symbol=foo,} \\ & \texttt{addend=0\}} \\
   \hline
 \end{tabular}
-
+\caption{Examples of the conversion from a \texttt{mov} instruction to relocation metadata.}
+\label{mov_table}
+\end{figure}
 
 \subsubsection{Addition}
-The \texttt{add} instruction allows to compute an addition and save the result to a destination. copy a value from a source to a destination. It is again trivial to build a this instruction using \texttt{SYM} relocation entries. The syntax of the instruction is:
+The \texttt{add} instruction allows to compute an addition and save the result to a destination. copy a value from a source to a destination. It is again trivial to build this instruction using \texttt{SYM} relocation entries. The syntax of the instruction is:
 
 \texttt{add <dest>, <addend1>, <addend2>}
 
 \texttt{<dest>} has to be specified as a direct value, \texttt{<addend1>} as a register value, and \texttt{<addend 2>} as an immediate value.
 
-The following is an example of the conversion from an \texttt{add} instruction to relocation metadata.
+Figure \ref{add_table} shows an example of a relocation entry that forms an \texttt{add} instruction.
 
+\begin{figure}
 \begin{tabular}{ l | l }
   \hline
   \texttt{add *0xbeef0000, \%foo, \$0x02} & \texttt{\{type=SYM, offset=0xbeef0000, symbol=foo,} \\ 
 & \texttt{addend=2\}} \\
   \hline
 \end{tabular}
+\caption{Example of the conversion from an \texttt{add} instruction to relocation metadata.}
+\label{add_table}
+\end{figure}
 
 
 \subsubsection{Jump-if-not-zero}
@@ -213,17 +224,16 @@ It is possible to achieve this by exploiting the RTLD behavior. These are the st
 \item Change the value of \texttt{end} to exit the for loop
 \end{enumerate}
 
-The following table summarizes the process needed to achieve each point.
 
-\begin{longtable}{ l | p{0.75\textwidth} }
-  \hline
-  1 & A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. \\ & E.g.: \texttt{mov *<addr of prev>, \$<addr of link\_map>} \\ \hline \\
-  2-3 & For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions \\ & E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>} \\ \hline \\
-  4 & \texttt{end} is stored on the stack. If ASLR is turned on, its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
+The following summarizes the process needed to achieve each point.
+
+\begin{itemize}
+  \item[1.] A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. \\ E.g.: \texttt{mov *<addr of prev>, \$<addr of link\_map>}
+  \item[2-3.] For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions \\ E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>}
+  \item[4.] \texttt{end} is stored on the stack. If ASLR is turned on, its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
 address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set \texttt{end} to 0, forcing the loop to exit prematurely: \\
-  & \texttt{mov *<addr of next Rela's offset>, \%sym-end mov *<(value overwritten)>, \$0} \\
-  \hline
-\end{longtable}
+ \texttt{mov *<addr of next Rela's offset>, \%sym-end mov *<(value overwritten)>, \$0}
+\end{itemize}
 
 \paragraph{Conditional branch.} To move from an unconditional branch to a conditional one there is the need of a bit more logic. For this feature we need to exploit the RTLD behavior with \texttt{IFUNC} type symbols: these structures are processed in two different ways, depending on the value of the \texttt{shndx} field. (1) If it is not 0, then the RTLD treats the symbol as an indirect function, calling the function it points to and using the returned value. (2) If the \texttt{shndx} field is zero, then that symbol's value is used directly.
 
@@ -269,7 +279,7 @@ Interrupt handling and address translations are controlled using registers and t
 
 \subsection{Introduction to MMU and trap handling}
 
-First of all some basic definition are presented.
+First of all some basic definitions are presented.
 
 \paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
 
@@ -277,7 +287,7 @@ First of all some basic definition are presented.
 
 \paragraph{TR: } Task register, it is a register that contains the selector for the "current" task state segment. Whenever the CPU switches to a different task it will save its state to the TSS stored in TR.
 
-\paragraph{IDT: } Interrupt descriptor table, it is a data structure used by the CPU to determine the correct response to interrupts and traps. Every interrupt handler is a pointer to a TSS descriptor in the GDT.
+\paragraph{IDT: } Interrupt descriptor table, it is a data structure used by the CPU to determine the correct response to interrupts and traps. Every interrupt handler references a TSS descriptor in the GDT.
 
 \paragraph{GDT: } Global Descriptor Table, it contains segment descriptors. The CPU addresses memory through an index into the GDT, called \texttt{segment selector} and an offset into the resulting interval.
 
@@ -298,7 +308,7 @@ The following summarizes how an interrupt is handled by the OS on x86.
 
 \subsection{Weird machine primitives}
 
-The only instruction we need to build is called \texttt{movdbz}, that stays for "move-branch-if-zero-or-decrement".
+The only instruction we need to build is called \texttt{movdbz}, that stands for "move-branch-if-zero-or-decrement".
 
 \texttt{movdbz <dest> <source> <branch>}
 
@@ -316,7 +326,7 @@ For the construction of the weird machine the following components are needed:
 \item one page table per instruction (the memory is remapped, depending on the instruction)
 \end{itemize}
 
-The original authors built a compiler that converts \texttt{movdbz} instructions to these components. \cite{trapcc}
+The original authors built a compiler that converts \texttt{movdbz} instructions to these components \cite{trapcc}.
 
 This is the pseudocode of the algorithm we want to execute, with a brief explanation of how to achieve this using only the MMU:
 \begin{lstlisting}
@@ -342,7 +352,7 @@ The following schema summarizes the lifecycle of the weird machine.
 \item The "execution" goes back to point 1. It is hence important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
 \end{enumerate}
 
-This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. This are some examples:
+This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. These are some examples:
 \begin{itemize}
 \item the CR3 register is not changed when saving the TSS state, so that each instruction has its own page table.
 \item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
@@ -412,7 +422,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 The study of trustworthiness of computing systems is typically predicated on assurance regarding the types of computation these systems can and cannot be driven: this machines show that there are many grey areas in this field that need more work and analysis.
 These results demonstrate that special crafting of ELF metadata can lead to the execution of instruction on the CPU and modifications of the memory, moreover the unorthodox use of MMU features in modern processors can result in powerful computation, driven entirely by in-memory descriptor tables without dispatching any native instructions.
 
-These observations lead to new questions in the field of trusted systems and, hopefully, encourage new efforts in research, in order to enumerating and characterizing other unexpected computational environments.
+These observations lead to new questions in the field of trusted systems and, hopefully, encourage new efforts in research, in order to enumerate and characterize other unexpected computational environments.
 
 \begin{thebibliography}{12}
 \bibitem{elf_machine} R. Shapiro, S. Bratus, S. W. Smith {\sl "Weird Machines" in ELF: A Spotlight on the Underappreciated Metadata}; WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
@@ -425,7 +435,9 @@ These observations lead to new questions in the field of trusted systems and, ho
 
 \bibitem{ping_elf} elf-bf-tools - \url{https://github.com/bx/elf-bf-tools}
 
-\bibitem{hund} Hund, R., Holz T., Freiling, F. C.: {\sl Return-oriented rootkits: bypassing kernel code integrity protection mechanisms}; In Proceedings of the 18th USENIX Security Symposium (2009), USENIX Association, pp. 383–398.
+\bibitem{hund} R. Hund, T. Holz, F. C. Freiling: {\sl Return-oriented rootkits: bypassing kernel code integrity protection mechanisms}; In Proceedings of the 18th USENIX Security Symposium (2009), USENIX Association, pp. 383–398.
+
+\bibitem{noncontroldata} S. Chen, J. Xu, E. C. Sezer, P. Gauriar, R. K. Iyer: {\sl Non-control-data attacks are realistic threats}; In Proceedings of the 14th on USENIX Security Symposium (2005), USENIX Association
 
 \bibitem{smashing} Aleph One: {\sl Smashing The Stack For Fun And Profit}; Phrack 49
 
