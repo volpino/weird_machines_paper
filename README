@@ -1,0 +1,16 @@
+Software exploitation does not always imply running attacker-supplied binary
+shellcode. A well-known example of "unexpected computation" are return-to-libc
+and more general return-oriented programming. These recent papers [1, 2]
+present two further ways to generate "weid machines" for software exploitation,
+using ABI metadata and page faults, respectively.
+
+
+[1] Rebecca Shapiro, Sergey Bratus, and Sean W. Smith. 2013. "Weird machines" in
+ELF: a spotlight on the underappreciated metadata. In Proceedings of the 7th
+USENIX conference on Offensive Technologies (WOOT'13). USENIX Association,
+Berkeley, CA, USA, 11-11.
+
+[2] Julian Bangert, Sergey Bratus, Rebecca Shapiro, and Sean W. Smith. 2013. The
+page-fault weird machine: lessons in instruction-less computation.
+In Proceedings of the 7th USENIX conference on Offensive Technologies
+(WOOT'13). USENIX Association, Berkeley, CA, USA, 13-13.
