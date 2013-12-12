@@ -18,6 +18,7 @@
 \usepackage{enumitem}
 \usepackage{listings}
 \usepackage{longtable}
+\usepackage{graphicx}
 
 %\usepackage{mathpazo}  % -- use Palatino --
 %\usepackage{mathptmx}  % -- or Times --
@@ -165,7 +166,7 @@ The \texttt{mov} instruction allows to copy a value from a source to a destinati
 
 \texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. Figure \ref{mov_table} shows two examples of relocation entries that form a \texttt{mov} instruction.
 
-\begin{figure}
+\begin{figure}[ht]
 \begin{tabular}{ l | l }
   \hline
   \texttt{mov *0xbeef0000, \$0x04} & \texttt{\{type=RELATIVE, offset=0xbeef0000, symbol=0,} \\ &  \texttt{addend=0x04\}} \\
@@ -186,7 +187,7 @@ The \texttt{add} instruction allows to compute an addition and save the result t
 
 Figure \ref{add_table} shows an example of a relocation entry that forms an \texttt{add} instruction.
 
-\begin{figure}
+\begin{figure}[ht]
 \begin{tabular}{ l | l }
   \hline
   \texttt{add *0xbeef0000, \%foo, \$0x02} & \texttt{\{type=SYM, offset=0xbeef0000, symbol=foo,} \\ 
@@ -352,9 +353,16 @@ The following schema summarizes the lifecycle of the weird machine.
 \item The "execution" goes back to point 1. It is hence important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
 \end{enumerate}
 
+%\begin{figure}[ht]
+%\centering
+%\includegraphics[scale=0.3]{tss.png}
+%\caption{The TSS is placed on a page boundary: by playing with page tables, when saving the state, the upper part will point to the physical address of the next TSS while the lower part will point to a GDT entry (to clear the \emph{busy-bit})}
+%\label{TSS_fig}
+%\end{figure}
+
 This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. These are some examples:
 \begin{itemize}
-\item the CR3 register is not changed when saving the TSS state, so that each instruction has its own page table.
+\item By placing the TSS on a page boundary the upper part of the table is saved in the "next instruction" (i.e. the next TSS) to keep the ESP state, while the CR3 register is not overwritten. %See Figure \ref{TSS_fig}.
 \item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
 \item It is not possible to switch to the same task pointed by the TR
 \item triple faults cause the machine to reboot, so they must be avoided
@@ -370,24 +378,24 @@ An interesting fact is that it is possible to switch between the weird machine a
 
 \section{Comparison of weird machines \#1 and \#2}
 
-The two weird machines presented in this document are very different but both achieve the same goal: unexpected computation in a totally unanticipated way. This opens to new techniques of hiding malware and new approaches to malware analysis.
+The two weird machines presented in this document are very different but both achieve the same goal: unexpected computation in a totally unanticipated way. 
+This opens to new techniques of hiding malware and new approaches to malware analysis.
 
-A brief comparison of advantages and disadvantages of each machine is presented in the following paragraphs.
+A brief comparison of advantages and disadvantages of each machine is presented in Figure \ref{advantages} and \ref{disadvantages}.
 
-\subsection{Advantages of the given constructions}
-
-\begin{longtable}{ p{0.4\textwidth} | p{0.4\textwidth} }
-\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline \\
-\begin{itemize}
+\begin{figure}[ht!]
+\begin{longtable}{ p{0.5\textwidth} | p{0.5\textwidth} }
+\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline
+\begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Metadata is not usually considered harmful, most defenses focus on actual code
 \item Metadata is not always considered when signing executables
 \item Not influenced by ASLR
 \item The code is untouched
 \item The weird machine metadata is still well formed, it does not fail any sanity check
-\item ELF metadata is extremely powerful, it can locate stack and all mapped libraries, redirect library calls or even perform function calls
+\item ELF metadata can locate stack and all mapped libraries, redirect library calls or even perform function calls
 \end{itemize}
 &
-\begin{itemize}
+\begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item No native instruction needed for computation
 \item Can be extremely difficult to detect and to analyze what it is actually computing
 \item Possible to switch between weird machine and real instructions almost transparently
@@ -395,13 +403,15 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \end{itemize} \\
 
 \end{longtable}
+\caption{Advantages of the given constructions}
+\label{advantages}
+\end{figure}
 
 
-\subsection{Limitations of the given constructions}
-
-\begin{longtable}{ p{0.4\textwidth} | p{0.4\textwidth} }
-\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline \\
-\begin{itemize}
+\begin{figure}[ht!]
+\begin{longtable}{ p{0.5\textwidth} | p{0.5\textwidth} }
+\bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline
+\begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Runs native instructions, computation is not so hidden
 \item Implementation specific for a version of \emph{glibc}, could easily break with other versions
 \item Not possible to switch between weird machine and "normal" execution
@@ -409,12 +419,15 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 &
 \begin{itemize}
 \item Needs kernel access to setup the components (GDT, IDT, TSSs, etc...)
-\item Can only use the \texttt{movdbz} instruction, which is very minimalistic and not practical
-\item Because of implementation issues it can only work with ESP of TSSs aligned across pages. This lead to a very limited coverage of physical memory
+\item Can only use the \texttt{movdbz} instruction: very minimalistic and not practical
+\item Because of implementation issues it can only work with ESP of TSSs aligned across pages. This leads to a very limited coverage of physical memory
 \item Need to insert dummy instructions to not have triple faults 
 \end{itemize} \\
 
 \end{longtable}
+\caption{Limitations of the given constructions}
+\label{disadvantages}
+\end{figure}
 
 
 \section{Conclusions}
