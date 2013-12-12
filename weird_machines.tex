@@ -60,7 +60,7 @@
 \title{Weird Machines}
 \author{Federico Scrinzi \\
   (\texttt{federico.scrinzi@campus.tu-berlin.de})\\[5mm]
-  "`Computer Security Seminar"' , \\
+  ``Computer Security Seminar" , \\
   Technische Universität Berlin
 }
   
@@ -96,13 +96,13 @@ This section summarizes the work done by R. Shapiro, S. Bratus and S. W. Smith \
 The Executable and Linkable Format (ELF) is a file format for object code, executables and shared libraries. It is commonly used in many Unix-like systems such as Linux, *BSD and Solaris.
 Each ELF file is composed by an ELF Header (metadata) followed by the actual data.
 
-There are three main types of object files:
-\begin{itemize}
-\item Relocatable files hold code and data suitable for linking with other object files to create an
-executable or a shared object file.
-\item Executable files hold a program suitable for execution.
-\item Shared object files holds code and data suitable for linking in two contexts. First, the link editor may process it with other relocatable and shared object files to create another object file. Second, the dynamic linker combines it with an executable file and other shared objects to create a process image.
-\end{itemize}
+%There are three main types of object files:
+%\begin{itemize}
+%\item Relocatable files hold code and data suitable for linking with other object files to create an
+%executable or a shared object file.
+%\item Executable files hold a program suitable for execution.
+%\item Shared object files holds code and data suitable for linking in two contexts. First, the link editor may process it with other relocatable and shared object files to create another object file. Second, the dynamic linker combines it with an executable file and other shared objects to create a process image.
+%\end{itemize}
 
 The loading and execution of a program can be summarized in the following steps:
 \begin{enumerate}
@@ -129,13 +129,26 @@ Symbols are a way to assign mnemonic names to addresses. ELF provides two differ
 Three types of relocation entries are interesting for constructing the weird machine, they are shown in Table \ref{r_entries}.
 
 \begin{table}
+\centering
 \begin{tabular}{ l | l }
   \hline
-  \texttt{R\_X86\_64\_COPY} (COPY) & \texttt{memcpy(r.offset,s.value,s.size)} \\
-  \texttt{R\_X86\_64\_64} (SYM) & \texttt{*(base+r.offset)=s.value+r.addend+base} \\
-  \texttt{R\_X86\_64\_RELATIVE} (RELATIVE) & \texttt{*(base+r.offset)=r.addend+base} \\
+  \texttt{R\_X86\_64\_COPY} (COPY)
+  &
+\begin{lstlisting}
+memcpy(r.offset,s.value,s.size)
+\end{lstlisting} \\
+  \texttt{R\_X86\_64\_64} (SYM) &
+\begin{lstlisting}
+*(base+r.offset)=s.value+
+                 r.addend+base
+\end{lstlisting} \\
+  \texttt{R\_X86\_64\_RELATIVE} (RELATIVE) &
+\begin{lstlisting}
+*(base+r.offset)=r.addend+base
+\end{lstlisting} \\
   \hline
 \end{tabular}
+  \captionsetup{width=13.5cm}
   \caption{ELF relocation entries that the weird machine uses. Their meaning is presented in C-like syntax where \texttt{r} is the relocation entry, \texttt{s} is the corresponding symbol and \texttt{base} is the base address of the ELF object.}
   \label{r_entries}
 \end{table}
@@ -167,11 +180,28 @@ The \texttt{mov} instruction allows to copy a value from a source to a destinati
 \texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. Figure \ref{mov_table} shows two examples of relocation entries that form a \texttt{mov} instruction.
 
 \begin{figure}[ht]
+\centering
 \begin{tabular}{ l | l }
   \hline
-  \texttt{mov *0xbeef0000, \$0x04} & \texttt{\{type=RELATIVE, offset=0xbeef0000, symbol=0,} \\ &  \texttt{addend=0x04\}} \\
-  \hline \\
-  \texttt{mov *0xbeef0000, [\%foo]} & \texttt{\{type=COPY, offset=0xbeef0000, symbol=foo,} \\ & \texttt{addend=0\}} \\
+\begin{lstlisting}
+mov *0xbeef0000,
+    $0x04
+\end{lstlisting}
+&
+\begin{lstlisting}
+{type=RELATIVE, offset=0xbeef0000,
+ symbol=0, addend=0x04}
+\end{lstlisting} \\
+  \hline
+\begin{lstlisting}
+mov *0xbeef0000,
+    [%foo]
+\end{lstlisting}
+&
+\begin{lstlisting}
+{type=COPY, offset=0xbeef0000,
+ symbol=foo, addend=0}
+\end{lstlisting} \\
   \hline
 \end{tabular}
 \caption{Examples of the conversion from a \texttt{mov} instruction to relocation metadata.}
@@ -188,14 +218,23 @@ The \texttt{add} instruction allows to compute an addition and save the result t
 Figure \ref{add_table} shows an example of a relocation entry that forms an \texttt{add} instruction.
 
 \begin{figure}[ht]
+\centering
 \begin{tabular}{ l | l }
   \hline
-  \texttt{add *0xbeef0000, \%foo, \$0x02} & \texttt{\{type=SYM, offset=0xbeef0000, symbol=foo,} \\ 
-& \texttt{addend=2\}} \\
+  \begin{lstlisting}
+add *0xbeef0000,
+    %foo, $0x02
+  \end{lstlisting}
+  &
+  \begin{lstlisting}
+{type=SYM, offset=0xbeef0000,
+ symbol=foo, addend=2}
+  \end{lstlisting} \\
   \hline
 \end{tabular}
 \caption{Example of the conversion from an \texttt{add} instruction to relocation metadata.}
 \label{add_table}
+\vspace{-0.4cm}
 \end{figure}
 
 
@@ -282,7 +321,7 @@ Interrupt handling and address translations are controlled using registers and t
 
 First of all some basic definitions are presented.
 
-\paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
+%\paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
 
 \paragraph{TSS: } Task state segment, it is a special structure which holds information about a task. Specifically, it contains: registers' state, I/O port permissions, inner-level stack pointers, previous TSS link. The CPU has hardware features that allow saving the entire state to a TSS and restoring it from there. Therefore, it is possible to switch between contexts with a single instruction or interrupt without any further logic.
 
@@ -353,16 +392,18 @@ The following schema summarizes the lifecycle of the weird machine.
 \item The "execution" goes back to point 1. It is hence important to remark that now we have a different page table than before (because of a different value in CR3). So, because of how the tables were crafted, the IDT entries for the PF or the DF will now point to a different TSS. Moreover, also the address in the TR will point to another TSS, so the modified state will be saved in the next instruction.
 \end{enumerate}
 
-%\begin{figure}[ht]
-%\centering
-%\includegraphics[scale=0.3]{tss.png}
-%\caption{The TSS is placed on a page boundary: by playing with page tables, when saving the state, the upper part will point to the physical address of the next TSS while the lower part will point to a GDT entry (to clear the \emph{busy-bit})}
-%\label{TSS_fig}
-%\end{figure}
+\begin{figure}[ht]
+\centering
+\includegraphics[scale=0.3]{tss.png}
+\captionsetup{width=13.5cm}
+\caption{The TSS is placed on a page boundary: by playing with page tables, when saving the state, the upper part will point to the physical address of the next TSS while the lower part will point to a GDT entry (to clear the \emph{busy-bit})
+}
+\label{TSS_fig}
+\end{figure}
 
 This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. These are some examples:
 \begin{itemize}
-\item By placing the TSS on a page boundary the upper part of the table is saved in the "next instruction" (i.e. the next TSS) to keep the ESP state, while the CR3 register is not overwritten. %See Figure \ref{TSS_fig}.
+\item By placing the TSS on a page boundary only the upper part of the table is saved in the "next instruction" (i.e. the next TSS) to keep the ESP state. The lower part, that contains the CR3 register, is not changed. See Figure \ref{TSS_fig}.
 \item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
 \item It is not possible to switch to the same task pointed by the TR
 \item triple faults cause the machine to reboot, so they must be avoided
@@ -384,7 +425,7 @@ This opens to new techniques of hiding malware and new approaches to malware ana
 A brief comparison of advantages and disadvantages of each machine is presented in Figure \ref{advantages} and \ref{disadvantages}.
 
 \begin{figure}[ht!]
-\begin{longtable}{ p{0.5\textwidth} | p{0.5\textwidth} }
+\begin{longtable}{ p{0.40\textwidth} | p{0.40\textwidth} }
 \bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Metadata is not usually considered harmful, most defenses focus on actual code
@@ -393,6 +434,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \item The code is untouched
 \item The weird machine metadata is still well formed, it does not fail any sanity check
 \item ELF metadata can locate stack and all mapped libraries, redirect library calls or even perform function calls
+\vspace{-0.5cm}
 \end{itemize}
 &
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
@@ -400,32 +442,35 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \item Can be extremely difficult to detect and to analyze what it is actually computing
 \item Possible to switch between weird machine and real instructions almost transparently
 \item Exploits only hardware features, no further logic needed
-\end{itemize} \\
-
+\vspace{-0.5cm}
+\end{itemize}
 \end{longtable}
 \caption{Advantages of the given constructions}
+\vspace{-0.8cm}
 \label{advantages}
 \end{figure}
 
 
 \begin{figure}[ht!]
-\begin{longtable}{ p{0.5\textwidth} | p{0.5\textwidth} }
+\begin{longtable}{ p{0.40\textwidth} | p{0.40\textwidth} }
 \bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Runs native instructions, computation is not so hidden
 \item Implementation specific for a version of \emph{glibc}, could easily break with other versions
 \item Not possible to switch between weird machine and "normal" execution
+\vspace{-0.5cm}
 \end{itemize}
 &
-\begin{itemize}
+\begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Needs kernel access to setup the components (GDT, IDT, TSSs, etc...)
 \item Can only use the \texttt{movdbz} instruction: very minimalistic and not practical
 \item Because of implementation issues it can only work with ESP of TSSs aligned across pages. This leads to a very limited coverage of physical memory
-\item Need to insert dummy instructions to not have triple faults 
-\end{itemize} \\
-
+\item Need to insert dummy instructions to not have triple faults
+\vspace{-0.5cm}
+\end{itemize}
 \end{longtable}
 \caption{Limitations of the given constructions}
+\vspace{-0.8cm}
 \label{disadvantages}
 \end{figure}
 
