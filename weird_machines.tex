@@ -1,6 +1,6 @@
 \documentclass[11pt,twoside,a4paper]{article}
 \usepackage{a4wide,amsmath,amssymb}
-% \usepackage[ngerman]{babel}
+\usepackage[british]{babel}
 \usepackage[utf8x]{inputenc}
 \hyphenation{}
 
@@ -34,6 +34,7 @@
 
 % correctly format URLs and email addresses
 \usepackage{url}
+\usepackage{cite}
 % example for email addresses: \url{foo@bar.com}
 
 % Tools for note taking, ideas...
@@ -56,7 +57,6 @@
 }}
 
 \begin{document}
-
 \title{Weird Machines}
 \author{Federico Scrinzi \\
   (\texttt{federico.scrinzi@campus.tu-berlin.de})\\[5mm]
@@ -69,7 +69,7 @@
 \maketitle
 
 \abstract{
-What are exploits in fact? It is possible to define them as programs that run on an unanticipated computational structure, performing unexpected computation. Buffer overflows, uncontrolled format strings or SQL injections are just some classical examples of vulnerabilities that allow to achieve this goal. It is possible to see exploits for these flaws as input data used as bytecode on some kind of virtual machine. We will call this class of peculiar VMs \emph{weird machines}.
+What are exploits in fact? It is possible to define them as programs that run on an unanticipated computational structure, performing unexpected computation. Buffer overflows, uncontrolled format strings or SQL injections are just few classical examples of vulnerabilities that allow to achieve this goal. It is possible to see exploits for these flaws as input data used as bytecode on some kind of virtual machine. We will call this class of peculiar VMs \emph{weird machines}.
 
 Unexpected computation means not only the execution of unintended instructions on the CPU but can be achieved also using Turing complete machines hidden in the target. This paper will present two examples of weird machines: the first based on ABI metadata while the second on the MMU.
 }
@@ -85,12 +85,14 @@ Modern systems hide a plethora of weird machines that might be exploited, the ne
 
 Therefore, security research's core subjects of study-trust and trustworthiness in computing systems are now faced with new questions, such as "What execution paths can programs be trusted to not take under any circumstances, no matter what the inputs?" or "Which properties of inputs can a particular security system verify, and which are beyond its limits?" \cite{bratus}.
 
+This paper introduces two kind of weird machines: the first based on ELF metadata \cite{elf_machine} (Section 2), while the second on page faults and interrupt handling \cite{mmu_machine} (Section 3). Later, a brief comparison of these two constructions is presented (Section 4).
+
 %Exploits based on weird machines are harder to detect than classical ones and hidden, unexpected computation can be a really dangerous threat. For that reason higher and higher consideration should be given to the study of this field, to reveal new potential hazard and build more secure systems.
 
 
 \section{Weird machine \#1: ELF metadata construction}
 
-This section summarizes the work done by R. Shapiro, S. Bratus and S. W. Smith \cite{elf_machine} in building a weird machine that exploits ELF relocation metadata to do computation.
+This section presents the work of R. Shapiro, S. Bratus and S. W. Smith \cite{elf_machine} in building a weird machine that exploits ELF relocation metadata to achieve computation.
 
 \subsection{Introduction to ELF}
 The Executable and Linkable Format (ELF) is a file format for object code, executables and shared libraries. It is commonly used in many Unix-like systems such as Linux, *BSD and Solaris.
@@ -103,8 +105,7 @@ Each ELF file is composed by an ELF Header (metadata) followed by the actual dat
 %\item Executable files hold a program suitable for execution.
 %\item Shared object files holds code and data suitable for linking in two contexts. First, the link editor may process it with other relocatable and shared object files to create another object file. Second, the dynamic linker combines it with an executable file and other shared objects to create a process image.
 %\end{itemize}
-
-The loading and execution of a program can be summarized in the following steps:
+The loading and execution of a program can be summarized in the following steps \cite{eresi}:
 \begin{enumerate}
 \item The \texttt{exec()} system call is called with the path of the executable. The kernel takes control of the execution (\texttt{int \$0x80}) and reads a small subset of the executable's metadata in order to map the executable into memory and the executable's interpreter (typically the RTLD, \texttt{ld.so}) into the process' address space.
 \item A context switch into userland is made and the interpreter is started (\texttt{RTLD\_START()} is called in the case of \texttt{ld.so})
@@ -113,7 +114,7 @@ The loading and execution of a program can be summarized in the following steps:
 \end{enumerate}
 
 \subsubsection{Addresses relocation} 
-For our purposes the executable's metadata and the patching of the memory by the interpreter is particularly important, as the weird machine presented in this section is based on those primitives. We will go a bit more in detail in this step.
+%For our purposes the executable's metadata and the patching of the memory by the interpreter is particularly important, as the weird machine presented in this section is based on those primitives. We will go a bit more in detail in this step.
 
 Unlike executables, when shared libraries are being built, the linker can not assume a known load address for their code. The reason for this is simple: each program can use any number of shared libraries, and there is simply no way to know in advance where any given shared library will be loaded in the process's virtual memory. This problem is solved by the RTLD.
 
@@ -121,8 +122,9 @@ The true entry point of the interpreter is \texttt{\_dl\_start}, this function i
 
 It is important to remark that every object in the dynamic linker is described by a \texttt{link\_map} structure. Those structures are only created at runtime and contain different kind of information, such as: the base address at which the ELF object was loaded, the virtual address of all the ELF object's dynamic table entries or pointers to other loaded link map structures. All the \texttt{link\_map} structures form a doubly linked list so from every structure we can find information on any other loaded ELF object by traversing the list.
 
-Symbols are a way to assign mnemonic names to addresses. ELF provides two different symbol tables: \texttt{.symtab} and \texttt{.dynsym}. \texttt{.dynsym} is just a smaller version of the \texttt{.symtab} that only contains global symbols, it contains information required at runtime such as the names of the needed libraries. Symbol metadata is memorized using \texttt{Elf64\_Sym} structures. This kind of metadata is used in the following construction to build registers: symbols with 8 byte values are used, type must be set to \texttt{FUNC} so it is treated as a regular symbol. An example is the following:
-\texttt{\{name=foo, value=0xb0000000, type=FUNC, shndx=1, size=8\}}
+Symbols are a way to assign mnemonic names to addresses. ELF provides two different symbol tables: \texttt{.symtab} and \texttt{.dynsym}. \texttt{.dynsym} is just a smaller version of the \texttt{.symtab} that only contains global symbols, it contains information required at runtime such as the names of the needed libraries. Symbol metadata is memorized using \texttt{Elf64\_Sym} structures. This kind of metadata is used in the following construction to build registers: symbols with 8 byte values are used, type must be set to \texttt{FUNC} so it is treated as a regular symbol. An example is the following: \begin{lstlisting}
+{name=foo, value=0xb0000000, type=FUNC, shndx=1, size=8}
+\end{lstlisting}
 
 \texttt{.rela.dyn} and \texttt{.rela.plt} are two tables that contain relocation entries composed by structures of type \texttt{Elf64\_Rela}. Relocation entries are used to patch the table with the locations of imported library functions at runtime. The difference between the two tables is that \texttt{.rela.plt} entries are typically processed lazily during dynamic linking while \texttt{.rela.dyn} relocation entries are processed during load time, just before the RTLD passes control to the executable.
 
@@ -151,19 +153,13 @@ memcpy(r.offset,s.value,s.size)
   \captionsetup{width=13.5cm}
   \caption{ELF relocation entries that the weird machine uses. Their meaning is presented in C-like syntax where \texttt{r} is the relocation entry, \texttt{s} is the corresponding symbol and \texttt{base} is the base address of the ELF object.}
   \label{r_entries}
+  \vspace{-0.4cm}
 \end{table}
 
 
 \subsection{Weird machine primitives}
 
-The weird machine presented in this section implements a simplified assembly-like language. It offers the following instructions:
-\begin{itemize}
-\item Move (\texttt{mov})
-\item Addition (\texttt{add})
-\item Jump-if-not-zero (\texttt{jnz})
-\end{itemize}
-
-Accepted input formats for those instructions are:
+The weird machine presented in this section implements a simplified assembly-like language. It offers the following instructions: move (\texttt{mov}), addition (\texttt{add}) and jump-if-not-zero (\texttt{jnz}). Accepted input formats for those instructions are:
 \begin{itemize}
 \item Immediate (e.g.: \texttt{\$0x42})
 \item Direct, the given location contains the value address (e.g.: \texttt{*0xcafebabe})
@@ -175,9 +171,11 @@ Accepted input formats for those instructions are:
 \subsubsection{Move}
 The \texttt{mov} instruction allows to copy a value from a source to a destination. It is trivial to build a \texttt{mov} instruction using relocation entries of type \texttt{RELATIVE}. The syntax of the instruction is:
 
-\texttt{mov <dest>, <value>}
+\begin{lstlisting}
+mov <dest>, <value>
+\end{lstlisting}
 
-\texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. Figure \ref{mov_table} shows two examples of relocation entries that form a \texttt{mov} instruction.
+Because of the structure of relocation entries \texttt{<dest>} has to be passed in direct mode while \texttt{<value>} supports either immediate or register indirect values. Figure \ref{mov_table} shows two examples of relocation entries that form a \texttt{mov} instruction.
 
 \begin{figure}[ht]
 \centering
@@ -205,15 +203,18 @@ mov *0xbeef0000,
   \hline
 \end{tabular}
 \caption{Examples of the conversion from a \texttt{mov} instruction to relocation metadata.}
+\vspace{-0.4cm}
 \label{mov_table}
 \end{figure}
 
 \subsubsection{Addition}
 The \texttt{add} instruction allows to compute an addition and save the result to a destination. copy a value from a source to a destination. It is again trivial to build this instruction using \texttt{SYM} relocation entries. The syntax of the instruction is:
 
-\texttt{add <dest>, <addend1>, <addend2>}
+\begin{lstlisting}
+add <dest>, <addend1>, <addend2>
+\end{lstlisting}
 
-\texttt{<dest>} has to be specified as a direct value, \texttt{<addend1>} as a register value, and \texttt{<addend 2>} as an immediate value.
+Because of the structure of relocation entries  \texttt{<dest>} has to be specified as a direct value, \texttt{<addend1>} as a register value, and \texttt{<addend 2>} as an immediate value.
 
 Figure \ref{add_table} shows an example of a relocation entry that forms an \texttt{add} instruction.
 
@@ -239,10 +240,10 @@ add *0xbeef0000,
 
 
 \subsubsection{Jump-if-not-zero}
-\texttt{jne} instructions allow to transfer the flow of execution to another point of the program. It is not easy to implement jumps using relocation entries, as for their original purpose there is no need for the interpreter to jump between them.
+\texttt{jne} instructions allow to transfer the flow of execution to another point of the program. It is not easy to implement jumps using relocation entries, as, for their original purpose, there is no need for the interpreter to jump between them.
 
 \paragraph{Building an unconditional jump.}
-The processing of relocation addresses by the RTLD can be summarized as follows:
+The processing of relocation addresses by the RTLD can be summarized with the following simplified code \cite{elf_machine}. For each \texttt{link\_map} structure (\texttt{lm}), the location (\texttt{lm->dyn[DT\_RELA]}) and size (\texttt{lm->dyn[DT\_RELASZ]}) of the object's relocation table are looked-up, then each relocation table entry is processed (with \texttt{relocate()}):
 \begin{lstlisting}
 while (lm != NULL) {
   r = lm->dyn[DT_RELA];
@@ -268,18 +269,29 @@ It is possible to achieve this by exploiting the RTLD behavior. These are the st
 The following summarizes the process needed to achieve each point.
 
 \begin{itemize}
-  \item[1.] A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. \\ E.g.: \texttt{mov *<addr of prev>, \$<addr of link\_map>}
-  \item[2-3.] For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions \\ E.g.: \texttt{mov *(<address of DT\_RELA>), <address of next relocation entry to process>}
+  \item[1.] A pointer to the \texttt{link\_map} is stored in the Global Offset Table (GOT), whose address is known at compile time. Thus, it is possible to compute the final address of \texttt{prev} and use a \texttt{mov} instruction to overwrite it. E.g.:
+  \begin{lstlisting}
+mov *<addr of prev>, $<addr of link_map>
+  \end{lstlisting}
+  \item[2-3.] For achieving this there is the requirement of knowing the virtual address of the dynamic table. It is possible to calculate it at compile time, again with \texttt{mov} instructions. E.g.:
+  \begin{lstlisting}
+mov *(<addr of DT_RELA>), <addr of next entry to process>
+  \end{lstlisting}
   \item[4.] \texttt{end} is stored on the stack. If ASLR is turned on, its location is randomized. Luckily the loader stores the address of some stack-allocated data in a statically-allocated variable. We can lookup the base-address of the loader to calculate the location of this static variable. Assuming the
-address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set \texttt{end} to 0, forcing the loop to exit prematurely: \\
- \texttt{mov *<addr of next Rela's offset>, \%sym-end mov *<(value overwritten)>, \$0}
+address of \texttt{end} is stored in a symbol called \texttt{sym-end}, the following instructions will set \texttt{end} to 0, forcing the loop to exit prematurely:
+ \begin{lstlisting}
+mov *<addr of next Rela's offset>, %sym-end
+mov *<(value overwritten)>, $0
+ \end{lstlisting}
 \end{itemize}
 
 \paragraph{Conditional branch.} To move from an unconditional branch to a conditional one there is the need of a bit more logic. For this feature we need to exploit the RTLD behavior with \texttt{IFUNC} type symbols: these structures are processed in two different ways, depending on the value of the \texttt{shndx} field. (1) If it is not 0, then the RTLD treats the symbol as an indirect function, calling the function it points to and using the returned value. (2) If the \texttt{shndx} field is zero, then that symbol's value is used directly.
 
-For achieving our goal we need a special symbol (that we call \texttt{sym-zero}) that is of type \texttt{IFUNC} and points to a function that returns zero. Then we need the following instructions:\\
-\texttt{mov *<addr of sym-zero shndx>, \$<test val>} \\
-\texttt{add *<addr of end>, \%sym-zero, \$0}
+For achieving our goal we need a special symbol (that we call \texttt{sym-zero}) that is of type \texttt{IFUNC} and points to a function that returns zero. Then we need the following instructions:
+\begin{lstlisting}
+mov *<addr of sym-zero shndx>, $<test val>
+add *<addr of end>, %sym-zero, $0
+\end{lstlisting}
 
 In this way if the value being tested is zero, then also \texttt{\%sym-zero} will be treated as zero (because of the \texttt{IFUNC} processing), so \texttt{end} will be zero and the for loop will exit. Otherwise \texttt{end} will be greater than zero, so the following instruction, that resets \texttt{end} to its original value, will be executed and the computation will go on without branching.
 
@@ -290,7 +302,7 @@ Using the given primitives it is possible to achieve computation using only ELF 
 
 The original authors of the paper built a Brainfuck to ELF-metadata compiler to demonstrate how to practically awake the hidden weird machine in the RTLD.
 
-This document will not explain implementation challenges and constraints, but, if the reader is interested, he can go into more detail by reading the original paper \cite{elf_machine}. However, here there are some points that is important to keep in mind when implementing this weird machine:
+This document will not explain implementation challenges and constraints, but, if the reader is interested, he can go into more detail by reading the original paper \cite{elf_machine}. However, here there are particular points that are important to keep in mind when implementing this weird machine:
 \begin{itemize}
 \item For implementing conditional branching there is the need to know the base address of the RTLD. This is not trivial.
 \item Existing metadata should not be corrupted, we want the final executable to still run as normal.
@@ -311,15 +323,17 @@ To better explain how an attacker could exploit this weird machine the original 
 
 To get ping to execute arbitrary programs as root, we have to insert relocation metadata to override the call to \texttt{setuid()} to not do anything useful (so privileges are not dropped) and the call to \texttt{strcasecmp} to launch a \texttt{execl} instead. It turns out that it can be implemented using nine relocation entries and one symbol table entry, without making any changes to the executable segments of ping.
 
-It is interesting to notice that is possible to achieve this even without all the power of Turing-completeness, hence an attacker might need very little power to exploit weird machines.
+%It is interesting to notice that is possible to achieve this even without all the power of Turing-completeness, hence an attacker might need very little power to exploit weird machines.
 
 \section{Weird machine \#2: Page fault driven computation}
-The goal of the weird machine presented in this section is to exploit the MMU to do computation. This suggests that we could consider the internal logic of page fault and memory translation as the finite automaton of a Turing machine and the memory as holding its "tape", by potentially creating a kind of a closed loop of memory accesses.
-Interrupt handling and address translations are controlled using registers and tables. Moreover, when a page fault occurs the information about the trap is saved on the stack. By setting the address of the trap handler to cause another fault we will end up with the processor continuously dispatching page-faults. If the tables controlling this behavior are crafted in the right way, the side effects of the interrupt handling form a Turing-complete one-instruction computer.
+The goal of the weird machine presented in this section is to exploit the MMU to do computation \cite{mmu_machine}.
+%This suggests that we could consider the internal logic of page fault and memory translation as the finite automaton of a Turing machine and the memory as holding its "tape", by potentially creating a kind of a closed loop of memory accesses.
+
+Interrupt handling and address translations are controlled using registers and tables, moreover, when a page fault occurs the information about the trap is saved on the stack. By setting the address of the trap handler to cause another fault we will end up with the processor continuously dispatching page-faults. If the tables controlling this behavior are crafted in the right way, the side effects of the interrupt handling form a Turing-complete one-instruction computer.
 
 \subsection{Introduction to MMU and trap handling}
 
-First of all some basic definitions are presented.
+In order to understand MMU and trap handling a set of definitions is presented \cite{intel}.
 
 %\paragraph{MMU: } Memory management unit, it is an hardware component responsible for handling accesses to memory requested by the CPU. Among other features it is in charge of translating virtual addresses to physical addresses.
 
@@ -336,7 +350,7 @@ First of all some basic definitions are presented.
 
 \subsubsection{X86 interrupt handling}
 
-The following summarizes how an interrupt is handled by the OS on x86.
+The following summarizes how an interrupt is handled by the OS on x86 \cite{intel}.
 
 \begin{enumerate}
 \item An interrupt is raised
@@ -394,14 +408,14 @@ The following schema summarizes the lifecycle of the weird machine.
 
 \begin{figure}[ht]
 \centering
-\includegraphics[scale=0.3]{tss.png}
+\includegraphics[scale=0.30]{tss.png}
 \captionsetup{width=13.5cm}
-\caption{The TSS is placed on a page boundary: by playing with page tables, when saving the state, the upper part will point to the physical address of the next TSS while the lower part will point to a GDT entry (to clear the \emph{busy-bit})
+\caption{The TSS is placed on a page boundary: by playing with page tables, when saving the state, the upper part will point to the physical address of the next TSS while the lower part will point to a GDT entry (to clear the \emph{busy-bit}) \cite{intel}
 }
 \label{TSS_fig}
 \end{figure}
 
-This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. These are some examples:
+This description, however, is a little simplified. There are many constraints and implementation issues that are not covered by this paper, refer to the original one for more information \cite{mmu_machine}. These are few examples:
 \begin{itemize}
 \item By placing the TSS on a page boundary only the upper part of the table is saved in the "next instruction" (i.e. the next TSS) to keep the ESP state. The lower part, that contains the CR3 register, is not changed. See Figure \ref{TSS_fig}.
 \item When an instruction is executed the CPU sets the \emph{busy bit} in the GDT, therefore it is not possible to jump back to that instruction without resetting the bit.
@@ -434,7 +448,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \item The code is untouched
 \item The weird machine metadata is still well formed, it does not fail any sanity check
 \item ELF metadata can locate stack and all mapped libraries, redirect library calls or even perform function calls
-\vspace{-0.5cm}
+\vspace{-0.6cm}
 \end{itemize}
 &
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
@@ -442,7 +456,7 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \item Can be extremely difficult to detect and to analyze what it is actually computing
 \item Possible to switch between weird machine and real instructions almost transparently
 \item Exploits only hardware features, no further logic needed
-\vspace{-0.5cm}
+\vspace{-0.6cm}
 \end{itemize}
 \end{longtable}
 \caption{Advantages of the given constructions}
@@ -452,13 +466,14 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 
 
 \begin{figure}[ht!]
+\vspace{-0.1cm}
 \begin{longtable}{ p{0.40\textwidth} | p{0.40\textwidth} }
 \bfseries{ELF metadata weird machine} & \bfseries{MMU weird machine} \\ \hline
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
 \item Runs native instructions, computation is not so hidden
 \item Implementation specific for a version of \emph{glibc}, could easily break with other versions
 \item Not possible to switch between weird machine and "normal" execution
-\vspace{-0.5cm}
+\vspace{-0.6cm}
 \end{itemize}
 &
 \begin{itemize}[noitemsep,topsep={0pt},partopsep={0pt}]
@@ -466,11 +481,11 @@ A brief comparison of advantages and disadvantages of each machine is presented 
 \item Can only use the \texttt{movdbz} instruction: very minimalistic and not practical
 \item Because of implementation issues it can only work with ESP of TSSs aligned across pages. This leads to a very limited coverage of physical memory
 \item Need to insert dummy instructions to not have triple faults
-\vspace{-0.5cm}
+\vspace{-0.6cm}
 \end{itemize}
 \end{longtable}
 \caption{Limitations of the given constructions}
-\vspace{-0.8cm}
+\vspace{-0.6cm}
 \label{disadvantages}
 \end{figure}
 
@@ -482,28 +497,8 @@ These results demonstrate that special crafting of ELF metadata can lead to the 
 
 These observations lead to new questions in the field of trusted systems and, hopefully, encourage new efforts in research, in order to enumerate and characterize other unexpected computational environments.
 
-\begin{thebibliography}{12}
-\bibitem{elf_machine} R. Shapiro, S. Bratus, S. W. Smith {\sl "Weird Machines" in ELF: A Spotlight on the Underappreciated Metadata}; WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
+\bibliographystyle{plain}
+\bibliography{bibliography}
 
-\bibitem{mmu_machine} J. Bangert, S. Bratus, R. Shapiro, S. W. Smith {\sl The Page-Fault Weird Machine: Lessons in Instruction-less Computation};  WOOT'13 Proceedings of the 7th USENIX conference on Offensive Technologies (2013)
-
-\bibitem{bratus} S. Bratus, M. E. Locasto, M. L. Patterson, L. Sassaman, A. Shubina: {\sl Exploit Programming From Buffer Overflows to "Weird Machines" and Theory of Computation}
-
-\bibitem{trapcc} trapcc - computing with traps \url{https://github.com/jbangert/trapcc}
-
-\bibitem{ping_elf} elf-bf-tools - \url{https://github.com/bx/elf-bf-tools}
-
-\bibitem{hund} R. Hund, T. Holz, F. C. Freiling: {\sl Return-oriented rootkits: bypassing kernel code integrity protection mechanisms}; In Proceedings of the 18th USENIX Security Symposium (2009), USENIX Association, pp. 383–398.
-
-\bibitem{noncontroldata} S. Chen, J. Xu, E. C. Sezer, P. Gauriar, R. K. Iyer: {\sl Non-control-data attacks are realistic threats}; In Proceedings of the 14th on USENIX Security Symposium (2005), USENIX Association
-
-\bibitem{smashing} Aleph One: {\sl Smashing The Stack For Fun And Profit}; Phrack 49
-
-\bibitem{eresi} mayhem: {\sl Understanding Linux ELF RTLD internals}; Phrack 59
-
-\bibitem{html} Elitheeli: {\sl "stupid machines"}; \url{https://github.com/ elitheeli/stupid-machines}
-
-\bibitem{cpp_templates} Veldhuizen, T. L.:  {\sl C++ Templates are Turing Complete}; \url{http://ubietylab.net/ubigraph/content/Papers/pdf/CppTuring.pdf}; Indiana University Computer Science.
-\end{thebibliography}
 \end{document}
 
